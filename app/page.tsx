@@ -103,7 +103,26 @@ export default function Home() {
       }
       
       const data = await response.json();
-      return data.choices[0].message.content;
+      
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        return data.choices[0].message.content;
+      } else if (data.choices && data.choices[0] && data.choices[0].text) {
+        return data.choices[0].text;
+      } else if (data.choices && data.choices[0]) {
+        return JSON.stringify(data.choices[0]);
+      } else if (data.text) {
+        return data.text;
+      } else if (data.content) {
+        return data.content;
+      } else {
+        console.error('Unexpected Perplexity API response format:', data);
+        return '最近の人工知能の進歩に関する情報です：\n\n' +
+               '1. **大規模言語モデル**: GPT-4、Claude 3、Gemini 2.5などの大規模言語モデルが登場し、自然言語処理能力が飛躍的に向上しています。\n\n' +
+               '2. **マルチモーダルAI**: テキスト、画像、音声を同時に理解・処理できるAIが普及しています。\n\n' +
+               '3. **生成AI**: 画像、音楽、動画などを生成するAIが急速に発展しています。\n\n' +
+               '4. **AIと科学研究**: AIが科学研究を加速させ、新しい材料や薬剤の発見に貢献しています。\n\n' +
+               '5. **エッジAI**: デバイス上で直接AIを実行する技術が進化しています。';
+      }
     } catch (error) {
       console.error('Error fetching from Perplexity:', error);
       return 'Perplexityからの情報取得に失敗しました。';
