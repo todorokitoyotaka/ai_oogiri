@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-opus-20240229',
+      model: 'claude-3-7-sonnet-20250219',
       system: 'あなたはClaude 3.7です。日本語で回答してください。他のAIと会話をしています。',
       messages: formattedMessages,
       max_tokens: 1000,
