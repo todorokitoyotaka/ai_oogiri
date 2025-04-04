@@ -1,103 +1,224 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { Message } from './types';
+import ChatMessage from './components/ChatMessage';
+import ChatInput from './components/ChatInput';
+import ClearButton from './components/ClearButton';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentTurn, setCurrentTurn] = useState<number>(0);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleClearConversation = () => {
+    setMessages([]);
+    setCurrentTurn(0);
+  };
+
+  const handleSendMessage = async (content: string) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    try {
+      const perplexityResponse = await fetchPerplexityResearch(content);
+      
+      const perplexityMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        model: 'perplexity',
+        content: perplexityResponse,
+        timestamp: Date.now(),
+      };
+      
+      setMessages(prev => [...prev, perplexityMessage]);
+      
+      const chatGptResponse = await fetchChatGptResponse([...messages, userMessage, perplexityMessage]);
+      
+      const chatGptMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        model: 'chatgpt',
+        content: chatGptResponse,
+        timestamp: Date.now(),
+      };
+      
+      setMessages(prev => [...prev, chatGptMessage]);
+      
+      const claudeResponse = await fetchClaudeResponse([...messages, userMessage, perplexityMessage, chatGptMessage]);
+      
+      const claudeMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        model: 'claude',
+        content: claudeResponse,
+        timestamp: Date.now(),
+      };
+      
+      setMessages(prev => [...prev, claudeMessage]);
+      
+      const geminiResponse = await fetchGeminiResponse([...messages, userMessage, perplexityMessage, chatGptMessage, claudeMessage]);
+      
+      const geminiMessage: Message = {
+        id: uuidv4(),
+        role: 'assistant',
+        model: 'gemini',
+        content: geminiResponse,
+        timestamp: Date.now(),
+      };
+      
+      setMessages(prev => [...prev, geminiMessage]);
+      
+      setCurrentTurn(prev => prev + 1);
+    } catch (error) {
+      console.error('Error in conversation flow:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchPerplexityResearch = async (query: string): Promise<string> => {
+    try {
+      const response = await fetch('/api/perplexity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Perplexity API request failed');
+      }
+      
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Error fetching from Perplexity:', error);
+      return 'Perplexityからの情報取得に失敗しました。';
+    }
+  };
+
+  const fetchChatGptResponse = async (messageHistory: Message[]): Promise<string> => {
+    try {
+      const formattedMessages = messageHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      const response = await fetch('/api/chatgpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: formattedMessages }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('ChatGPT API request failed');
+      }
+      
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Error fetching from ChatGPT:', error);
+      return 'ChatGPTからの応答取得に失敗しました。';
+    }
+  };
+
+  const fetchClaudeResponse = async (messageHistory: Message[]): Promise<string> => {
+    try {
+      const formattedMessages = messageHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: formattedMessages }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Claude API request failed');
+      }
+      
+      const data = await response.json();
+      return data.content[0].text;
+    } catch (error) {
+      console.error('Error fetching from Claude:', error);
+      return 'Claudeからの応答取得に失敗しました。';
+    }
+  };
+
+  const fetchGeminiResponse = async (messageHistory: Message[]): Promise<string> => {
+    try {
+      const formattedMessages = messageHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: formattedMessages }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Gemini API request failed');
+      }
+      
+      const data = await response.json();
+      return data.text;
+    } catch (error) {
+      console.error('Error fetching from Gemini:', error);
+      return 'Geminiからの応答取得に失敗しました。';
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6 text-center">AI 大喜利チャット</h1>
+      
+      <div className="flex justify-end mb-4">
+        <ClearButton onClear={handleClearConversation} />
+      </div>
+      
+      <div className="bg-white rounded-lg shadow-md p-4 mb-4 min-h-[400px] max-h-[600px] overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="text-center text-gray-500 mt-20">
+            <p>会話を始めるには、質問を入力してください。</p>
+            <p className="mt-2 text-sm">各AIが日本語で回答します。</p>
+          </div>
+        ) : (
+          messages.map(message => (
+            <ChatMessage key={message.id} message={message} />
+          ))
+        )}
+      </div>
+      
+      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      
+      {isLoading && (
+        <div className="text-center mt-4 text-gray-500">
+          AIが考え中です...
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
